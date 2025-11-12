@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Ping Pong — 2 Player & AI Version</title>
+  <title>Ping Pong — Advanced Controls</title>
   <style>
     :root {
       --bg: #0f1724;
@@ -50,7 +50,7 @@
   </style>
 </head>
 <body>
-  <div class="hud">W/S = Player 1 | ↑/↓ = Player 2 (or AI) | Space = Pause | M = Toggle AI</div>
+  <div class="hud">W/S/A/D = Player 1 | ↑/↓/←/→ = Player 2 (or AI) | Space = Pause | M = Toggle AI</div>
   <canvas id="game" width="900" height="450"></canvas>
   <button id="toggleAI">Switch to AI Mode</button>
   <audio id="bgm" loop autoplay>
@@ -63,16 +63,17 @@
     const toggleBtn = document.getElementById('toggleAI');
 
     const W = canvas.width, H = canvas.height;
-    const left = {x: 20, y: H/2-40, w: 10, h: 80, dy: 0};
-    const right = {x: W-30, y: H/2-40, w: 10, h: 80, dy: 0};
-    const ball = {x: W/2, y: H/2, r: 8, vx: 5, vy: 3};
+    const left = {x: 20, y: H/2-40, w: 10, h: 80, dy: 0, dx: 0};
+    const right = {x: W-30, y: H/2-40, w: 10, h: 80, dy: 0, dx: 0};
+    const ball = {x: W/2, y: H/2, r: 8, vx: 5, vy: 3, speed: 5};
 
     let leftScore = 0, rightScore = 0, paused = true, aiMode = false;
 
     function resetBall(direction = 1) {
       ball.x = W / 2;
       ball.y = H / 2;
-      ball.vx = 5 * direction;
+      ball.speed = 5;
+      ball.vx = ball.speed * direction;
       ball.vy = (Math.random() * 4 - 2);
     }
 
@@ -91,14 +92,21 @@
 
       // Left paddle
       if (ball.x - ball.r < left.x + left.w && ball.y > left.y && ball.y < left.y + left.h) {
-        ball.vx *= -1;
+        let power = 1 + (left.dx > 0 ? 0.5 : left.dx < 0 ? -0.3 : 0);
+        ball.vx = Math.abs(ball.vx) * power;
+        ball.vx = Math.min(ball.vx, 12);
+        ball.vx *= 1;
         ball.x = left.x + left.w + ball.r;
+        ball.vy += left.dy * 0.2;
       }
 
       // Right paddle
       if (ball.x + ball.r > right.x && ball.y > right.y && ball.y < right.y + right.h) {
-        ball.vx *= -1;
+        let power = 1 + (right.dx < 0 ? 0.5 : right.dx > 0 ? -0.3 : 0);
+        ball.vx = -Math.abs(ball.vx) * power;
+        ball.vx = Math.max(ball.vx, -12);
         ball.x = right.x - ball.r;
+        ball.vy += right.dy * 0.2;
       }
 
       // Score
@@ -113,11 +121,16 @@
         right.y = Math.max(0, Math.min(H - right.h, right.y));
       } else {
         right.y += right.dy;
+        right.x += right.dx;
       }
 
       left.y += left.dy;
+      left.x += left.dx;
+
       left.y = Math.max(0, Math.min(H - left.h, left.y));
       right.y = Math.max(0, Math.min(H - right.h, right.y));
+      left.x = Math.max(0, Math.min(W/2 - left.w - 20, left.x));
+      right.x = Math.max(W/2 + 10, Math.min(W - right.w, right.x));
     }
 
     function draw() {
@@ -143,7 +156,6 @@
       requestAnimationFrame(loop);
     }
 
-    // Controls
     const keys = {};
     window.addEventListener('keydown', e => {
       keys[e.key.toLowerCase()] = true;
@@ -153,8 +165,15 @@
     window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
     function handleControls() {
+      // Player 1 (W/S/A/D)
       left.dy = keys['w'] ? -6 : keys['s'] ? 6 : 0;
-      if (!aiMode) right.dy = keys['arrowup'] ? -6 : keys['arrowdown'] ? 6 : 0;
+      left.dx = keys['a'] ? -3 : keys['d'] ? 3 : 0;
+
+      // Player 2 (↑/↓/←/→)
+      if (!aiMode) {
+        right.dy = keys['arrowup'] ? -6 : keys['arrowdown'] ? 6 : 0;
+        right.dx = keys['arrowleft'] ? -3 : keys['arrowright'] ? 3 : 0;
+      }
     }
 
     function toggleAI() {
