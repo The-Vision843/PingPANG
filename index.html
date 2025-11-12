@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ping Pong — 2 Player & AI Version</title>
+  <style>
+    :root {
+      --bg: #0f1724;
+      --accent: #06b6d4;
+      --muted: #94a3b8;
+      --paddle: #e6eef6;
+    }
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: linear-gradient(180deg, var(--bg), #071023 80%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-family: system-ui, sans-serif;
+    }
+    canvas {
+      background: #0a1328;
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.6);
+    }
+    .hud {
+      position: fixed;
+      top: 10px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      color: #e6eef6;
+      font-weight: bold;
+    }
+    button {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="hud">W/S = Player 1 | ↑/↓ = Player 2 (or AI) | Space = Pause | M = Toggle AI</div>
+  <canvas id="game" width="900" height="450"></canvas>
+  <button id="toggleAI">Switch to AI Mode</button>
+  <audio id="bgm" loop autoplay>
+    <source src="https://cdn.pixabay.com/download/audio/2022/10/24/audio_8d6b6b60b1.mp3?filename=moonlight-sonata-beethoven-15007.mp3" type="audio/mpeg">
+  </audio>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const toggleBtn = document.getElementById('toggleAI');
+
+    const W = canvas.width, H = canvas.height;
+    const left = {x: 20, y: H/2-40, w: 10, h: 80, dy: 0};
+    const right = {x: W-30, y: H/2-40, w: 10, h: 80, dy: 0};
+    const ball = {x: W/2, y: H/2, r: 8, vx: 5, vy: 3};
+
+    let leftScore = 0, rightScore = 0, paused = true, aiMode = false;
+
+    function resetBall(direction = 1) {
+      ball.x = W / 2;
+      ball.y = H / 2;
+      ball.vx = 5 * direction;
+      ball.vy = (Math.random() * 4 - 2);
+    }
+
+    function drawRect(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); }
+    function drawCircle(x, y, r, c) { ctx.beginPath(); ctx.fillStyle = c; ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+    function drawText(t, x, y) { ctx.fillStyle = '#e6eef6'; ctx.font = '20px system-ui'; ctx.fillText(t, x, y); }
+
+    function update() {
+      if (paused) return;
+
+      ball.x += ball.vx;
+      ball.y += ball.vy;
+
+      // Wall bounce
+      if (ball.y - ball.r < 0 || ball.y + ball.r > H) ball.vy *= -1;
+
+      // Left paddle
+      if (ball.x - ball.r < left.x + left.w && ball.y > left.y && ball.y < left.y + left.h) {
+        ball.vx *= -1;
+        ball.x = left.x + left.w + ball.r;
+      }
+
+      // Right paddle
+      if (ball.x + ball.r > right.x && ball.y > right.y && ball.y < right.y + right.h) {
+        ball.vx *= -1;
+        ball.x = right.x - ball.r;
+      }
+
+      // Score
+      if (ball.x < 0) { rightScore++; resetBall(1); paused = true; }
+      if (ball.x > W) { leftScore++; resetBall(-1); paused = true; }
+
+      // AI behavior
+      if (aiMode) {
+        const target = ball.y - (right.h / 2);
+        if (right.y + right.h / 2 < ball.y) right.y += 4;
+        else right.y -= 4;
+        right.y = Math.max(0, Math.min(H - right.h, right.y));
+      } else {
+        right.y += right.dy;
+      }
+
+      left.y += left.dy;
+      left.y = Math.max(0, Math.min(H - left.h, left.y));
+      right.y = Math.max(0, Math.min(H - right.h, right.y));
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      drawRect(0, 0, W, H, '#0a1328');
+
+      drawRect(W/2 - 2, 0, 4, H, 'rgba(255,255,255,0.2)');
+      drawRect(left.x, left.y, left.w, left.h, '#e6eef6');
+      drawRect(right.x, right.y, right.w, right.h, '#e6eef6');
+      drawCircle(ball.x, ball.y, ball.r, '#06b6d4');
+
+      drawText(leftScore, W/2 - 50, 30);
+      drawText(rightScore, W/2 + 30, 30);
+
+      if (paused) {
+        drawText('Press SPACE to start', W/2 - 110, H/2);
+      }
+    }
+
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    // Controls
+    const keys = {};
+    window.addEventListener('keydown', e => {
+      keys[e.key.toLowerCase()] = true;
+      if (e.key === ' ') paused = !paused;
+      if (e.key.toLowerCase() === 'm') toggleAI();
+    });
+    window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+    function handleControls() {
+      left.dy = keys['w'] ? -6 : keys['s'] ? 6 : 0;
+      if (!aiMode) right.dy = keys['arrowup'] ? -6 : keys['arrowdown'] ? 6 : 0;
+    }
+
+    function toggleAI() {
+      aiMode = !aiMode;
+      toggleBtn.textContent = aiMode ? 'Switch to 2 Player Mode' : 'Switch to AI Mode';
+    }
+
+    toggleBtn.onclick = toggleAI;
+    setInterval(handleControls, 1000 / 60);
+
+    resetBall();
+    loop();
+  </script>
+</body>
+</html>
